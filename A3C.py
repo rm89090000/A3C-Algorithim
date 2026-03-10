@@ -88,9 +88,12 @@ while iters < limit:
     #calculate the average reward
     total_loss = (policy_loss + value_loss).mean()
     total_loss.backward()
+
+    #adds stability to prevent large error gradients
+    torch.nn.utils.clip_grad_norm_(model.values(), max_norm=0.5)
     optimizer.step()
 
-    reward_history.append(np.mean(rewards))
+    reward_history.append(float(np.mean(rewards)))
     #print out the data
     if len(reward_history) % 10 == 0:
         print(f"Total Steps {iters} | Average Reward: {reward_history}")
