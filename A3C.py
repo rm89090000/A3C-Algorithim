@@ -32,6 +32,10 @@ reward_history = []
 
 model = {'w1': tensor((first_dim, second_dim)),'b1': tensor((second_dim,), flag=True),'w_actor': tensor((second_dim, third_dim)),'b_actor': tensor((third_dim,), flag=True),'w_critic': tensor((second_dim, 1)),'b_critic': tensor((1,), flag=True),'log_std': torch.zeros(third_dim, requires_grad=True)}
 
+# Make sure the car turns exactly at the rate the steering wheel is moving
+with torch.no_grad():
+    model['w_actor'].mul_(0.01)
+
 optimizer = optim.Adam(model.values(), lr=1e-4)
 
 #change directory to current file
@@ -59,14 +63,20 @@ while iters < limit:
         action = dist.sample()
         
         car.step_dynamics(action.detach().numpy().flatten())
-        reward = 1.0 - abs(car.relative_state.x)
+        
+        # Use the reward formula: 1- |x|
+        reward = 1.0 - abs(car.relative_state.x) - abs(car.relative_state.yaw)
+        
+        #if car crashes, add a penalty
+        if car.done:
+            reward = -2.0 
         
         rewards.append(reward)
         probability.append(dist.log_prob(action).sum(-1))
         values.append(val)
         iters += 1
 
-    #if car is done being tested, reset the world
+    #if car is done running, reset the world
     if car.done:
         let_go = torch.zeros(1)
         world.reset()
